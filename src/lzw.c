@@ -369,4 +369,5 @@ void lzw(FILE *input, FILE *output, int compress)
 	// pthread_mutex_destroy(&vazio);
 	buffer_destroy(outbuf);
 	buffer_destroy(inbuf);
+	//teste
 }

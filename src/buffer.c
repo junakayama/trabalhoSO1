@@ -21,10 +21,15 @@
 #include <buffer.h>
 #include <pthread.h>
 #include <util.h>
-
+#include <semaphore.h>
+#include <stdio.h>
 /*
  * Buffer.
  */
+
+sem_t cheio_A, cheio_B, vazio_A, vazio_B;
+pthread_mutex_t mutex_A, mutex_B;
+
 struct buffer
 {
 	unsigned *data; /* Data.                        */
@@ -38,6 +43,14 @@ struct buffer
  */
 struct buffer *buffer_create(unsigned size)
 {
+	sem_init(&cheio_A,0,0);
+	sem_init(&cheio_B,0,0);
+	sem_init(&vazio_A,0,size);
+	sem_init(&vazio_B,0,size);
+
+	pthread_mutex_init(&mutex_A,NULL);
+	pthread_mutex_init(&mutex_B,NULL);
+
 	struct buffer *buf;
 	
 	/* Sanity check. */
@@ -59,6 +72,15 @@ struct buffer *buffer_create(unsigned size)
  */
 void buffer_destroy(struct buffer *buf)
 {
+
+	sem_destroy(&cheio_A);
+	sem_destroy(&cheio_B);
+	sem_destroy(&vazio_A);
+	sem_destroy(&vazio_B);
+
+	pthread_mutex_destroy(&mutex_A);
+	pthread_mutex_destroy(&mutex_B);
+
 	/* Sanity check. */
 	assert(buf != NULL);
 	
@@ -72,17 +94,24 @@ void buffer_destroy(struct buffer *buf)
  */
 void buffer_put(struct buffer *buf, unsigned item)
 {
+	sem_wait(&vazio_A);
 	/* Sanity check. */
 	assert(buf != NULL);
 
 	/* Expand buffer. */
-	if (buf->last == buf->size)
-	{
-		buf->data = srealloc(buf->data, 2*buf->size*sizeof(unsigned));
-		buf->size *= 2;
-	}
+	//if (buf->last == buf->size)
+	//{
+		
+		//buf->data = srealloc(buf->data, 2*buf->size*sizeof(unsigned));
+		//buf->size *= 2;
+	//}
 
-	buf->data[buf->last++] = item;
+	pthread_mutex_lock(&mutex_A);
+	buf->last = ((buf->last)+1) % buf->size;
+	buf->data[buf->last] = item;
+	pthread_mutex_unlock(&mutex_A);
+	sem_post(&cheio_A);
+	
 }
 
 /*
@@ -90,12 +119,17 @@ void buffer_put(struct buffer *buf, unsigned item)
  */
 unsigned buffer_get(struct buffer *buf)
 {
+	sem_wait(&cheio_A);
 	unsigned item;
-	
+
 	/* Sanity check. */
 	assert(buf != NULL);
-	
-	item = buf->data[buf->first++];
+	pthread_mutex_lock(&mutex_B);
+	buf->first = ((buf->first)+1) % buf->size;
+	item = buf->data[buf->first];
 
+	pthread_mutex_unlock(&mutex_B);
+	sem_post(&vazio_A);
 	return (item);
+
 }

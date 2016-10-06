@@ -73,6 +73,7 @@ static void lzw_writebits(buffer_t in, FILE *out)
 	
 	if (n > 0)
 		fputc((buf << (8 - n)) & 0xff, out);
+	pthread_exit(NULL);
 }
 
 /*============================================================================*
@@ -139,13 +140,11 @@ static void lzw_readbytes(FILE *infile, buffer_t outbuf)
  */
 static void lzw_writebytes(buffer_t inbuf, FILE *outfile)
 {
-	// pthread_mutex_lock(&cheio);
 	int ch;
 	
 	/* Read data from file to the buffer. */
 	while ((ch = buffer_get(inbuf)) != EOF)
 		fputc(ch, outfile);
-	// pthread_mutex_unlock(&vazio);
 }
 
 /*============================================================================*
@@ -168,7 +167,6 @@ static code_t lzw_init(dictionary_t dict, int radix)
  */
 static void lzw_compress(buffer_t in, buffer_t out)
 {	
-	// pthread_mutex_lock(&vazio);
 	unsigned ch;       /* Working character. */
 	int i, ni;         /* Working entries.   */
 	code_t code;       /* Current code.      */
@@ -214,7 +212,8 @@ static void lzw_compress(buffer_t in, buffer_t out)
 	buffer_put(out, EOF);
 
 	dictionary_destroy(dict);
-	// pthread_mutex_unlock(&cheio);
+
+	pthread_exit(NULL);
 }
 
 /*
@@ -240,7 +239,6 @@ static char *buildstr(char *base, char ch)
  */
 static void lzw_decompress(buffer_t in, buffer_t out)
 {
-	// pthread_mutex_lock(&vazio);
 	char *s, *p;   /* Working string. */
 	unsigned code; /* Working code.   */
 	unsigned i;    /* Loop index.     */
@@ -318,7 +316,8 @@ static void lzw_decompress(buffer_t in, buffer_t out)
 	while (i > 0)
 		free(st[--i]);
 	free(st);
-	// pthread_mutex_unlock(&cheio);
+
+	pthread_exit(NULL);
 }
 
 /*
@@ -344,29 +343,37 @@ void lzw(FILE *input, FILE *output, int compress)
 	argsCompress.outbuf = outbuf;
 	argsWrite.outbuf = outbuf;
 	argsWrite.output = output;
-	// pthread_mutex_init(&cheio, NULL);
-	// pthread_mutex_init(&vazio, NULL);
+	
 
 	/* Compress mode. */
 	if (compress)
 	{
-		lzw_readbytes(input, inbuf);
+		/*lzw_readbytes(input, inbuf);
+		lzw_compress(inbuf, outbuf);
+		lzw_writebits(outbuf, output);
+		*/
+		
 		pthread_create(&thread_A, NULL, (void *(*)(void *)) lzw_compress, &argsCompress);
 		pthread_create(&thread_B, NULL, (void *(*)(void *)) lzw_writebits, &argsWrite);
+		lzw_readbytes(input, inbuf);
 	}
-	
 	/* Decompress mode. */
 	else
 	{		
-		lzw_readbits(input, inbuf);
+		/*lzw_readbits(input, inbuf);
+		lzw_decompress(inbuf, outbuf);
+		lzw_writebytes(outbuf, output);
+		*/
+		
 		pthread_create(&thread_A, NULL, (void *(*)(void *)) lzw_decompress, &argsCompress);
 		pthread_create(&thread_B, NULL, (void *(*)(void *)) lzw_writebytes, &argsWrite);
+		lzw_readbits(input, inbuf);
+		
 	}
 	
 	pthread_join(thread_A, NULL);
 	pthread_join(thread_B, NULL);
-	// pthread_mutex_destroy(&cheio);
-	// pthread_mutex_destroy(&vazio);
+	
 	buffer_destroy(outbuf);
 	buffer_destroy(inbuf);
 }

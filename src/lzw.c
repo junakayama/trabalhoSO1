@@ -139,13 +139,13 @@ static void lzw_readbytes(FILE *infile, buffer_t outbuf)
  */
 static void lzw_writebytes(buffer_t inbuf, FILE *outfile)
 {
-	// pthread_mutex_lock(&cheio);
+	pthread_mutex_lock(&cheio);
 	int ch;
 	
 	/* Read data from file to the buffer. */
 	while ((ch = buffer_get(inbuf)) != EOF)
 		fputc(ch, outfile);
-	// pthread_mutex_unlock(&vazio);
+	pthread_mutex_unlock(&vazio);
 }
 
 /*============================================================================*
@@ -214,7 +214,7 @@ static void lzw_compress(buffer_t in, buffer_t out)
 	buffer_put(out, EOF);
 
 	dictionary_destroy(dict);
-	// pthread_mutex_unlock(&cheio);
+	pthread_mutex_unlock(&cheio);
 }
 
 /*
@@ -369,5 +369,4 @@ void lzw(FILE *input, FILE *output, int compress)
 	// pthread_mutex_destroy(&vazio);
 	buffer_destroy(outbuf);
 	buffer_destroy(inbuf);
-	//teste
 }
